@@ -13,24 +13,33 @@ async def handle_request(request):
     return web.Response(text="Bot is running")
 
 async def main() -> None:
+    # Setup Telegram Bot
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
 
-    # Add a minimal web server
-    app = web.Application()
-    app.add_routes([web.get('/', handle_request)])
-    runner = web.AppRunner(app)
+    # Setup Web Server
+    web_app = web.Application()
+    web_app.add_routes([web.get('/', handle_request)])
+    runner = web.AppRunner(web_app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 10000)))  # Use port from environment or 10000
+    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 10000)))
     await site.start()
 
-    asyncio.create_task(application.run_polling())
+    # Start the bot
+    await application.initialize()
+    await application.start()
 
-    # Keep the web server running
-    while True:
-        await asyncio.sleep(3600)
+    # Keep the application running
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        # Cleanup
+        await application.stop()
+        await site.stop()
+        await runner.cleanup()
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
-    loop.run_forever()
+    asyncio.run(main())
