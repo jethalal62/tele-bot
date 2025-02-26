@@ -2,58 +2,24 @@ import os
 import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-from aiohttp import web
 
 TELEGRAM_BOT_TOKEN = os.getenv("7511109980:AAEj0hHXZXC9Dh9dEI70ElZC3K3g9EW0xfU")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command with movie ID parameter"""
-    try:
-        # Get movie ID from deep link
-        movie_id = context.args[0] if context.args else None
-        response = f"🚀 Download link for movie {movie_id}:\nhttps://yourdomain.com/{movie_id}"
-        await update.message.reply_text(response)
-    except Exception as e:
-        print(f"Error handling /start: {e}")
-        await update.message.reply_text("⚠️ Error processing your request")
-
-async def web_handler(request):
-    """Basic web server handler for health checks"""
-    return web.Response(text="Bot is operational")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mandatory command handler"""
+    await update.message.reply_text("🚀 Bot is working!")
 
 async def main():
-    """Main async function to start both services"""
-    # Initialize Telegram Bot
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-
-    # Setup web server for Render health checks
-    runner = web.AppRunner(web.Application(router=web.RouteTableDef()))
-    runner.app.add_routes([web.get('/', web_handler)])
+    """Simplified startup sequence"""
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
     
-    try:
-        # Start web server first
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 8080)))
-        await site.start()
-
-        # Start polling for Telegram updates
-        print("🤖 Bot is starting...")
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling()
-
-        # Keep running
-        while True:
-            await asyncio.sleep(3600)
-
-    except Exception as e:
-        print(f"🔴 Critical error: {e}")
-    finally:
-        print("🛑 Shutting down...")
-        await application.stop()
-        await site.stop()
-        await runner.cleanup()
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    
+    print("✅ Bot successfully initialized")
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
