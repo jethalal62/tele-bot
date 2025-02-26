@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from aiohttp import web
 
-TELEGRAM_BOT_TOKEN = os.getenv("7511109980:AAE6WnvBWr7NbWl_vYDpNDlJsrpqrGMOyA0")
+TELEGRAM_BOT_TOKEN = os.getenv("7511109980:AAEj0hHXZXC9Dh9dEI70ElZC3K3g9EW0xfU")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command with movie ID parameter"""
