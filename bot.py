@@ -21,7 +21,7 @@ async def main() -> None:
     app.add_routes([web.get('/', handle_request)])
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 10000))) # Use port from environment or 10000
+    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 10000)))  # Use port from environment or 10000
     await site.start()
 
     asyncio.create_task(application.run_polling())
@@ -31,4 +31,6 @@ async def main() -> None:
         await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    loop.run_forever()
