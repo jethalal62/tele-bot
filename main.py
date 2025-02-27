@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import signal
 from telegram import Update
 from telegram.error import Conflict, RetryAfter
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -62,35 +63,47 @@ async def main():
         .post_shutdown(lambda _: logger.info("Bot shutdown")) \
         .build()
 
+    # Register commands
+    await application.bot.set_my_commands([
+        ("start", "Start the bot"),
+        ("file", "Get movie file by ID")
+    ])
+
     # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("file", file_handler))
 
-    # Graceful shutdown handler
-    async def shutdown(signal):
-        logger.info(f"Received {signal}, shutting down...")
-        await application.stop()
-        await application.shutdown()
+    # Signal handling
+    loop = asyncio.get_event_loop()
+    for s in [signal.SIGINT, signal.SIGTERM]:
+        loop.add_signal_handler(s, lambda: asyncio.create_task(shutdown(application)))
 
-    # Start polling with conflict handling
+    # Start polling with enhanced conflict handling
     try:
         await application.run_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES,
-            stop_signals=None  # Disable internal signal handling
+            stop_signals=None,
+            close_loop=False
         )
     except Conflict as e:
-        logger.critical(f"Conflict error: {e}. Another instance is running.")
+        logger.critical(f"Conflict detected: {e}. Ensure only one instance is running.")
     except RetryAfter as e:
-        logger.warning(f"Rate limited: Retry after {e.retry_after} seconds")
+        logger.warning(f"Rate limited. Retrying in {e.retry_after} seconds...")
         await asyncio.sleep(e.retry_after)
         await main()
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        logger.error(f"Unexpected error: {e}")
     finally:
         if application.running:
             await application.stop()
             await application.shutdown()
+
+async def shutdown(application: Application):
+    logger.info("Initiating graceful shutdown...")
+    await application.stop()
+    await application.shutdown()
+    logger.info("Bot successfully shutdown")
 
 if __name__ == "__main__":
     try:
