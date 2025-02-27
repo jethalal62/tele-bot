@@ -1,60 +1,29 @@
-import os
-from telegram import Update, ForceReply
-from telegram.ext import Updater, CommandHandler, CallbackContext
-from supabase import create_client
+```python
+import supabase
+from telegram.ext import Updater, CommandHandler
 
-# Initialize Supabase client using environment variables
-url = os.getenv("SUPABASE_URL")  # Environment variable for Supabase URL
-key = os.getenv("SUPABASE_API_KEY")  # Environment variable for Supabase API key
-supabase = create_client(url, key)
+# Initialize supabase
+supabase_client = supabase.create_client("supabase_url", "supabase_key")
 
-# Define the command handler for /start
-def start(update: Update, _: CallbackContext) -> None:
-    user = update.effective_user
-    update.message.reply_html(
-        rf"Hello {user.mention_html()}! Use /getfile <movie_id> to download your file.",
-        reply_markup=ForceReply(selective=True),
-    )
-
-# Define the command handler for /getfile
-def get_file(update: Update, context: CallbackContext) -> None:
-    if len(context.args) != 1:
-        update.message.reply_text("Please provide a movie ID. Usage: /getfile <movie_id>")
-        return
-    
-    movie_id = context.args[0]
-    
-    # Fetch movie details from Supabase
-    response = supabase.table('movies').select('*').eq('id', movie_id).execute()
-    
-    if response.data:
-        movie = response.data[0]
-        file_url = movie.get('telegram_url')
-        
-        if file_url:
-            update.message.reply_text(f"Here is your file: {file_url}")
-        else:
-            update.message.reply_text("File not available.")
+# Function to handle telegram download
+def start(update, context):
+    user_id = update.effective_user.id    # Check if user has interacted with bot before    if supabase_client.query("SELECT * FROM movies WHERE id = $1", [user_id]).count == 0:
+        context.bot.send_message(chat_id=update.effective_chat.id, text="No file found")
     else:
-        update.message.reply_text("Movie not found.")
+        file_data = supabase_client.query("SELECT * FROM movies WHERE id = $1", [user_id]).get("data")[0]
+        if file_data["telegram_url"]:
+            context.bot.send_document(chat_id=update.effective_chat.id, document=file_data["telegram_url"])
+        else:
+            context.bot.send_message(chat_id=update.effective_chat.id, text="No file found")
 
-def main() -> None:
-    # Create the Updater and pass your bot's token
-    updater = Updater(os.getenv("TELEGRAM_BOT_TOKEN"))  # Environment variable for Telegram bot token
+# Initialize telegram bot
+updater = Updater("telegram_token", use_context=True)
+dispatcher = updater.dispatcher
 
-    # Get the dispatcher to register handlers
-    dispatcher = updater.dispatcher
+# Add start handler
+start_handler = CommandHandler('start', start)
+dispatcher.add_handler(start_handler)
 
-    # Register handlers
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("getfile", get_file))
-
-    # Start the Bot
-    updater.start_polling()
-
-    # Run the bot until you send a signal to stop
-    updater.idle()
-
-if __name__ == '__main__':
-    main()
-    
+# Start the bot
+updater.start_polling()
+```
