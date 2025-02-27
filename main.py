@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from supabase import create_client, Client
 
-# Initialize Supabase with validated versions
+# Initialize Supabase
 supabase: Client = create_client(
     os.environ["SUPABASE_URL"],
     os.environ["SUPABASE_KEY"]
@@ -12,12 +12,17 @@ supabase: Client = create_client(
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        args = context.args
-        if args:
-            movie_id = args[0]
-            await send_file(update, movie_id)
-        else:
-            await update.message.reply_text("🤖 Send /file <movie_id>")
+        if context.args:
+            return await send_file(update, context.args[0])
+        await update.message.reply_text("🤖 Send /file <movie_id>")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if not context.args:
+            raise ValueError("Missing movie_id parameter")
+        await send_file(update, context.args[0])
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
@@ -39,23 +44,15 @@ async def send_file(update: Update, movie_id: str):
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
 async def main():
-    try:
-        # Initialize bot
-        token = os.environ["TELEGRAM_BOT_TOKEN"]
-        application = Application.builder().token(token).build()
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("file", 
-            lambda update, context: send_file(update, context.args[0])
-        ))
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    application = Application.builder().token(token).build()
+    
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("file", file_handler))
 
-        # Start polling
-        await application.run_polling()
-        
-    except Exception as e:
-        print(f"🔥 Critical failure: {str(e)}")
-    finally:
-        if 'application' in locals():
-            await application.stop()
+    # Start polling
+    await application.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
