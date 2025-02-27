@@ -1,2 +1,5 @@
 python-telegram-bot==20.5
 supabase==2.3.1
+httpx==0.24.1
+postgrest==0.10.8  # Critical fix
+gotrue==2.4.3      # Version compatible with supabase 2.3.1
