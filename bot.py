@@ -1,71 +1,33 @@
-import os
-from supabase import create_client, Client
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+from supabase import create_client
+import os
 
-# Initialize Supabase
-supabase: Client = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+BOT_TOKEN = os.getenv('TELEGRAM_TOKEN')
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /start command with deep linking"""
     movie_id = context.args[0] if context.args else None
-    
     if not movie_id:
-        await update.message.reply_text("ℹ️ Please use a valid movie link from our website")
+        await update.message.reply_text("Please use the website link to start")
         return
 
+    # Fetch from Supabase
+    data = supabase.table('movies').select('telegram_url, title').eq('id', movie_id).execute()
+    if not data.data:
+        await update.message.reply_text("Movie not found 🎬")
+        return
+
+    movie = data.data[0]
     try:
-        # Fetch movie data from Supabase
-        data = supabase.table('movies') \
-                     .select('*') \
-                     .eq('id', movie_id) \
-                     .execute()
-        
-        if not data.data:
-            raise ValueError("Movie not found")
-
-        movie = data.data[0]
-        response = f"🎬 *{movie['title']}* ({movie['release_year']})\n"
-        response += f"📁 Genre: {movie['genre']}\n\n"
-        response += f"{movie['description']}\n\n"
-
-        # Create buttons
-        keyboard = []
-        if movie['telegram_url']:
-            keyboard.append([InlineKeyboardButton("📥 Telegram Download", url=movie['telegram_url'])])
-        if movie['cloud_download_url']:
-            keyboard.append([InlineKeyboardButton("☁️ Cloud Download", url=movie['cloud_download_url'])])
-        if movie['streamhg_url']:
-            keyboard.append([InlineKeyboardButton("▶️ Watch Now", url=movie['streamhg_url'])])
-
-        await update.message.reply_text(
-            response,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
+        await update.message.reply_document(movie['telegram_url'], caption=f"Here's {movie['title']}")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}")
-
-async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to add new movies"""
-    if str(update.effective_user.id) != os.getenv('ADMIN_ID'):
-        await update.message.reply_text("⛔ Unauthorized")
-        return
-
-    # Implementation for file upload handling
-    # (Add your specific upload logic here)
+        await update.message.reply_text("Error sending file")
 
 if __name__ == '__main__':
-    app = Application.builder().token(os.getenv('TELEGRAM_TOKEN')).build()
-    
-    # Add handlers
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("upload", upload))
-    
-    # Webhook setup
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.getenv('PORT', 8443)),
-        webhook_url=os.getenv('WEBHOOK_URL')
-    )
+    application = Application.builder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler('start', start))
+    application.run_polling()
