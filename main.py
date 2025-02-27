@@ -6,71 +6,63 @@ from telegram import Update, InputFile
 from telegram.ext import Application, CommandHandler, ContextTypes
 from aiohttp import web
 
-# Configure absolute paths for Render
+# Configure paths
 BASE_DIR = Path(__file__).parent.resolve()
 sys.path.append(str(BASE_DIR))
+FILES_DIR = BASE_DIR / "files"  # Path to your files directory
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /start command and process movie_id from custom domain links"""
-    args = context.args  # Extract parameters like "movie123"
+    """Handle /start command with movie_id from deep links"""
+    args = context.args  # Extract movie_id (e.g., ?start=movie123)
     
     if args:
         movie_id = args[0]
-        await send_file(update, context, movie_id)
+        await send_file(update, movie_id)
     else:
-        await update.message.reply_text("🚀 Welcome! Use /file <movie_id> to get a file.")
+        await update.message.reply_text("🔍 Send a Movie ID like /file movie123")
 
-async def send_file(update: Update, context: ContextTypes.DEFAULT_TYPE, movie_id: str):
-    """Send a file based on movie_id"""
+async def send_file(update: Update, movie_id: str):
+    """Send file based on movie_id"""
     try:
-        # Map movie_id to a file (customize this logic)
-        file_path = BASE_DIR / "files" / f"{movie_id}.txt"
+        # Find the file (supports .txt, .mp4, etc.)
+        file_path = next(FILES_DIR.glob(f"{movie_id}.*"))  # Searches for ANY extension
         
-        # Send the file
         await update.message.reply_document(
             document=InputFile(file_path),
-            caption=f"Here’s your file for Movie ID: {movie_id}! 🎬"
+            caption=f"🎥 Here’s your file for ID: {movie_id}"
         )
-    except FileNotFoundError:
-        await update.message.reply_text("❌ Error: File not found for this ID.")
+    except StopIteration:
+        await update.message.reply_text("❌ No file found for this ID.")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
 async def handle_redirect(request: web.Request):
-    """Redirect users from https://mydomain.io/file-redirect/?id=movie_id to Telegram"""
+    """Redirect users from your domain to Telegram bot with movie_id"""
     movie_id = request.query.get("id", "")
-    bot_username = "YOUR_BOT_USERNAME"  # Replace with your bot's username
-    telegram_deep_link = f"https://t.me/{bot_username}?start={movie_id}"
-    
-    # Redirect to Telegram
-    return web.HTTPFound(telegram_deep_link)
+    bot_username = "SHARING_HuB_Bot"  # Replace with your bot's username
+    telegram_link = f"https://t.me/{bot_username}?start={movie_id}"
+    return web.HTTPFound(telegram_link)  # Redirect to Telegram
 
 async def web_server():
-    """Web server with redirect logic for your custom domain"""
+    """Web server for redirects and health checks"""
     app = web.Application()
-    port = int(os.environ.get('PORT', 8080))
-    
-    # Add routes
     app.add_routes([
-        web.get('/', lambda r: web.Response(text="Bot is active!")),
-        web.get('/file-redirect/', handle_redirect)  # Your custom endpoint
+        web.get("/", lambda r: web.Response(text="Bot Active!")),
+        web.get("/file-redirect/", handle_redirect)  # Your custom endpoint
     ])
-    
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
+    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8080)))
     await site.start()
     return runner, site
 
 async def main():
     try:
-        # Initialize Telegram bot
-        token = os.environ['TELEGRAM_BOT_TOKEN']
+        # Initialize bot
+        token = os.environ["TELEGRAM_BOT_TOKEN"]
         application = Application.builder().token(token).build()
-        
-        # Add command handlers
         application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("file", send_file))
+        application.add_handler(CommandHandler("file", lambda u, c: send_file(u, c.args[0])))  # /file movie123
 
         # Start web server
         runner, site = await web_server()
