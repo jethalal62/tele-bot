@@ -3,9 +3,9 @@ from telegram import Update, ForceReply
 from telegram.ext import Updater, CommandHandler, CallbackContext
 from supabase import create_client
 
-# Initialize Supabase client
-url = "YOUR_SUPABASE_URL"  # Replace with your Supabase URL
-key = "YOUR_SUPABASE_API_KEY"  # Replace with your Supabase API key
+# Initialize Supabase client using environment variables
+url = os.getenv("SUPABASE_URL")  # Environment variable for Supabase URL
+key = os.getenv("SUPABASE_API_KEY")  # Environment variable for Supabase API key
 supabase = create_client(url, key)
 
 # Define the command handler for /start
@@ -40,7 +40,7 @@ def get_file(update: Update, context: CallbackContext) -> None:
 
 def main() -> None:
     # Create the Updater and pass your bot's token
-    updater = Updater("YOUR_BOT_TOKEN")  # Replace with your Telegram bot token
+    updater = Updater(os.getenv("TELEGRAM_BOT_TOKEN"))  # Environment variable for Telegram bot token
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
