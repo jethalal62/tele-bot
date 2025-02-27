@@ -43,16 +43,17 @@ async def send_file(update: Update, movie_id: str):
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
-async def main():
+async def main_async():
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     application = Application.builder().token(token).build()
     
-    # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("file", file_handler))
 
-    # Start polling
     await application.run_polling()
 
+def main():
+    asyncio.run(main_async())
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
