@@ -13,22 +13,22 @@ logging.basicConfig(
 )
 
 # Load the bot token from the BOT_TOKEN environment variable.
-# (Either change your Render environment variable to BOT_TOKEN, or update this code to use TELEGRAM_TOKEN.)
+# (Ensure that in Render, you have set BOT_TOKEN to your bot token from BotFather.)
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise RuntimeError("No BOT_TOKEN provided! Set it in your Render environment variables.")
 
-# Create the Telegram bot application (using python-telegram-bot v20+)
+# Create the Telegram bot application (python-telegram-bot v20+)
 tg_app = Application.builder().token(TOKEN).build()
 
 # Define a simple /start command for Telegram
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Hello! I am your Telegram bot.")
 
-# Add the /start handler to the Telegram app
+# Add the /start handler
 tg_app.add_handler(CommandHandler("start", start))
 
-# Create a Flask app for health checks (this is our WSGI callable for Gunicorn)
+# Create a Flask app to serve as the WSGI callable for Gunicorn
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
@@ -37,15 +37,16 @@ def home():
 
 # Function to run the Telegram bot in a separate thread.
 def run_telegram_bot():
-    # Create a new event loop for this thread and set it as the current event loop.
+    # Create a new event loop for this thread and set it
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    tg_app.run_polling()
+    # Run polling without resetting signals (avoids signal-related errors in non-main threads)
+    tg_app.run_polling(reset_signals=False)
 
-# Start the Telegram bot in a daemon thread (so it doesn't block the Flask app)
+# Start the Telegram bot in a daemon thread
 threading.Thread(target=run_telegram_bot, daemon=True).start()
 
-# When running locally, start the Flask app
+# When running locally, run the Flask app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     flask_app.run(host="0.0.0.0", port=port)
