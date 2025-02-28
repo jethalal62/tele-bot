@@ -71,12 +71,12 @@ async def send_file(update: Update, context: CallbackContext) -> None:
     else:
         await update.message.reply_text("Please provide a Movie ID! Example: /file movie123")
 
-# Add command handlers
+# Add command handlers to the Telegram app
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("file", send_file))
 
 # ------------------------------
-# Global Asyncio Event Loop Initialization
+# Global Asyncio Event Loop Initialization for Bot Initialization
 # ------------------------------
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -92,10 +92,10 @@ def webhook():
     try:
         update_dict = request.get_json(force=True)
         update = Update.de_json(update_dict, telegram_app.bot)
-        loop.run_until_complete(telegram_app.process_update(update))
+        # Create a new event loop to process this update
+        asyncio.run(telegram_app.process_update(update))
         return jsonify({"status": "ok"}), 200
     except Exception as e:
-        # Print error to logs so you can diagnose the issue
         print("Webhook processing error:", e)
         return jsonify({"status": "error", "error": str(e)}), 500
 
