@@ -5,14 +5,15 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext
 from supabase import create_client
 
-# Environment variables
+# -------------------------------
+# 1) Load Environment Variables
+# -------------------------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 DATABASE_TABLE_NAME = os.getenv("DATABASE_TABLE_NAME")
 
-# Validate variables
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set!")
 if not WEBHOOK_URL:
@@ -24,13 +25,19 @@ if not SUPABASE_KEY:
 if not DATABASE_TABLE_NAME:
     raise RuntimeError("DATABASE_TABLE_NAME is not set!")
 
-# Supabase client
+# -------------------------------
+# 2) Create Supabase Client
+# -------------------------------
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Initialize Telegram app
+# -------------------------------
+# 3) Create Telegram Application
+# -------------------------------
 telegram_app = Application.builder().token(BOT_TOKEN).build()
-telegram_app.initialize()  # <-- Add this line
 
+# -------------------------------
+# 4) Define Command Handlers
+# -------------------------------
 async def start(update: Update, context: CallbackContext):
     await update.message.reply_text("Hello! I am your bot. Send /file movie123 to get files.")
 
@@ -49,16 +56,28 @@ async def send_file(update: Update, context: CallbackContext):
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("file", send_file))
 
-# Flask app
+# -------------------------------
+# 5) Global Asyncio Event Loop
+# -------------------------------
+# We create ONE event loop for everything:
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+# Initialize the bot ONCE in this global loop:
+loop.run_until_complete(telegram_app.initialize())
+
+# -------------------------------
+# 6) Create Flask App
+# -------------------------------
 app = Flask(__name__)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # Parse incoming update
     update_dict = request.get_json(force=True)
     update = Update.de_json(update_dict, telegram_app.bot)
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Process update in the same global loop
     loop.run_until_complete(telegram_app.process_update(update))
 
     return jsonify({"status": "ok"}), 200
@@ -67,6 +86,9 @@ def webhook():
 def home():
     return "Bot is running!", 200
 
+# -------------------------------
+# 7) Run Flask if Called Directly
+# -------------------------------
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
