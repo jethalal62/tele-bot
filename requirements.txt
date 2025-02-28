@@ -1,2 +1,4 @@
-supabase
 python-telegram-bot
+flask
+supabase
+gunicorn
