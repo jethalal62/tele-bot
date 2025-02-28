@@ -37,39 +37,51 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 # ------------------------------
-# /start Command Handler with Deep Linking
+# /start Command (Deep Link)
 # ------------------------------
 async def start(update: Update, context: CallbackContext) -> None:
-    # Check if the user clicked a deep link with an argument
+    """
+    If a user clicks a deep link like https://t.me/YourBot?start=lover_2024_720p
+    then context.args will contain ["lover_2024_720p"].
+    We'll fetch telegram_url from Supabase and send it.
+    """
     if context.args:
-        movie_id = context.args[0]
-        # Fetch file link from Supabase using the movie_id
-        response = supabase.table(DATABASE_TABLE_NAME).select("file_link").eq("movie_id", movie_id).execute()
+        movie_id = context.args[0]  # e.g. "lover_2024_720p"
+        response = supabase.table(DATABASE_TABLE_NAME) \
+                           .select("telegram_url") \
+                           .eq("id", movie_id) \
+                           .execute()
         if response.data:
-            file_link = response.data[0]["file_link"]
-            await update.message.reply_text(f"Here is your file: {file_link}")
+            tg_link = response.data[0]["telegram_url"]  # Make sure 'telegram_url' column exists
+            await update.message.reply_text(f"Here is your file: {tg_link}")
         else:
             await update.message.reply_text("No file found for this Movie ID.")
     else:
-        # If no argument, display a generic welcome message
-        await update.message.reply_text("Hello! I am your bot. Send /file movie123 to get files.")
+        # If user just typed /start with no argument
+        await update.message.reply_text("Hello! I am your bot. Send /file <movie_id> to get files.")
 
 # ------------------------------
-# /file Command Handler (Manual)
+# /file Command (Manual)
 # ------------------------------
 async def send_file(update: Update, context: CallbackContext) -> None:
+    """
+    If a user types /file lover_2024_720p manually, fetch 'telegram_url' from Supabase.
+    """
     if context.args:
         movie_id = context.args[0]
-        response = supabase.table(DATABASE_TABLE_NAME).select("file_link").eq("movie_id", movie_id).execute()
+        response = supabase.table(DATABASE_TABLE_NAME) \
+                           .select("telegram_url") \
+                           .eq("id", movie_id) \
+                           .execute()
         if response.data:
-            file_link = response.data[0]["file_link"]
-            await update.message.reply_text(f"Here is your file: {file_link}")
+            tg_link = response.data[0]["telegram_url"]
+            await update.message.reply_text(f"Here is your file: {tg_link}")
         else:
             await update.message.reply_text("No file found for this Movie ID.")
     else:
-        await update.message.reply_text("Please provide a Movie ID! Example: /file movie123")
+        await update.message.reply_text("Please provide a Movie ID! Example: /file lover_2024_720p")
 
-# Add handlers to Telegram application
+# Add command handlers
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("file", send_file))
 
@@ -81,7 +93,7 @@ asyncio.set_event_loop(loop)
 loop.run_until_complete(telegram_app.initialize())
 
 # ------------------------------
-# Flask Application for Webhook Handling
+# Flask App for Webhook Handling
 # ------------------------------
 app = Flask(__name__)
 
