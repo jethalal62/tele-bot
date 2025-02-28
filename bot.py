@@ -48,14 +48,18 @@ async def send_file(update: Update, context: CallbackContext):
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("file", send_file))
 
+# Flask app
 app = Flask(__name__)
 
 @app.route("/webhook", methods=["POST"])
-async def webhook():
+def webhook():
     update_dict = request.get_json(force=True)
     update = Update.de_json(update_dict, telegram_app.bot)
-    if update:
-        await telegram_app.process_update(update)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(telegram_app.process_update(update))
+
     return jsonify({"status": "ok"}), 200
 
 @app.route("/")
