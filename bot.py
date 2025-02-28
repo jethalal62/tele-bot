@@ -36,15 +36,20 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 # ------------------------------
-# /start Command Handler with Deep Linking
+# /start Command Handler (Deep Linking)
 # ------------------------------
 async def start(update: Update, context: CallbackContext) -> None:
+    # Debug prints to verify deep link parameter
+    print("Received /start command with args:", context.args)
     if context.args:
         movie_id = context.args[0]
+        print("Movie ID received:", movie_id)
+        # Fetch the telegram_url from Supabase for the given movie ID
         response = supabase.table(DATABASE_TABLE_NAME) \
                            .select("telegram_url") \
                            .eq("id", movie_id) \
                            .execute()
+        print("Supabase response data:", response.data)
         if response.data:
             tg_link = response.data[0]["telegram_url"]
             await update.message.reply_text(f"Here is your file: {tg_link}")
@@ -71,12 +76,12 @@ async def send_file(update: Update, context: CallbackContext) -> None:
     else:
         await update.message.reply_text("Please provide a Movie ID! Example: /file movie123")
 
-# Add command handlers to the Telegram app
+# Add command handlers to the Telegram application
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("file", send_file))
 
 # ------------------------------
-# Global Asyncio Event Loop Initialization for Bot Initialization
+# Global Asyncio Event Loop Initialization
 # ------------------------------
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -92,11 +97,11 @@ def webhook():
     try:
         update_dict = request.get_json(force=True)
         update = Update.de_json(update_dict, telegram_app.bot)
-        # Create a new event loop to process this update
-        asyncio.run(telegram_app.process_update(update))
+        # Process the update in our global event loop
+        loop.run_until_complete(telegram_app.process_update(update))
         return jsonify({"status": "ok"}), 200
     except Exception as e:
-        print("Webhook processing error:", e)
+        print("Error processing webhook:", e)
         return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route("/")
