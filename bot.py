@@ -1,53 +1,40 @@
 import os
-from flask import Flask, request
-from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, ContextTypes
-from supabase import create_client, Client
+import logging
+import threading
+from flask import Flask
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
-# Environment variables
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+# Set up logging
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Initialize Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Load the bot token from environment variables
+TOKEN = os.getenv("BOT_TOKEN")
 
-# Initialize bot and Flask app
-bot = Bot(token=TELEGRAM_TOKEN)
-app = Flask(__name__)
+# Initialize the bot application
+app = Application.builder().token(TOKEN).build()
 
-# Build the Application (new API)
-application = Application.builder().token(TELEGRAM_TOKEN).build()
+# Telegram command: /start
+async def start(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text("Hello! I am your Telegram bot.")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    args = context.args
-    if args:
-        file_id = args[0]
-        response = supabase.table("movies").select("*").eq("id", file_id).execute()
-        data = response.data
+# Add command handlers
+app.add_handler(CommandHandler("start", start))
 
-        if data and len(data) > 0:
-            file_info = data[0]
-            file_url = file_info.get("telegram_url")
-            title = file_info.get("title", "File")
-            chat_id = update.effective_chat.id
-            try:
-                await context.bot.send_document(chat_id=chat_id, document=file_url, caption=title)
-            except Exception as e:
-                await update.message.reply_text("Error sending file.")
-        else:
-            await update.message.reply_text("File not found.")
-    else:
-        await update.message.reply_text("Welcome! Use the website's Telegram download button.")
+# Flask app to keep Render & UptimeRobot happy
+flask_app = Flask(__name__)
 
-application.add_handler(CommandHandler("start", start))
+@flask_app.route('/')
+def home():
+    return "Bot is running!", 200  # UptimeRobot will now get a 200 OK response
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    # Process the update using the new Application method
-    application.run_update(update)
-    return "ok"
+def run_flask():
+    flask_app.run(host="0.0.0.0", port=10000)
 
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+# Start Flask in a separate thread
+threading.Thread(target=run_flask, daemon=True).start()
+
+# Start the bot
+if __name__ == "__main__":
+    logging.info("Starting bot...")
+    app.run_polling()
