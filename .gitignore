@@ -1,8 +1,4 @@
-# Ignore Python byte code files
+__pycache__/
+.env
 *.pyc
-
-# Ignore environment specific files
-__pycache__
-
-# Ignore the virtual environment
-venv/
+.DS_Store
