@@ -14,7 +14,6 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 DATABASE_TABLE_NAME = os.getenv("DATABASE_TABLE_NAME")
 
-# Validate that necessary variables are set
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set!")
 if not WEBHOOK_URL:
@@ -37,36 +36,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 # ------------------------------
-# /start Command (Deep Link)
+# /start Command Handler with Deep Linking
 # ------------------------------
 async def start(update: Update, context: CallbackContext) -> None:
-    """
-    If a user clicks a deep link like https://t.me/YourBot?start=lover_2024_720p
-    then context.args will contain ["lover_2024_720p"].
-    We'll fetch telegram_url from Supabase and send it.
-    """
-    if context.args:
-        movie_id = context.args[0]  # e.g. "lover_2024_720p"
-        response = supabase.table(DATABASE_TABLE_NAME) \
-                           .select("telegram_url") \
-                           .eq("id", movie_id) \
-                           .execute()
-        if response.data:
-            tg_link = response.data[0]["telegram_url"]  # Make sure 'telegram_url' column exists
-            await update.message.reply_text(f"Here is your file: {tg_link}")
-        else:
-            await update.message.reply_text("No file found for this Movie ID.")
-    else:
-        # If user just typed /start with no argument
-        await update.message.reply_text("Hello! I am your bot. Send /file <movie_id> to get files.")
-
-# ------------------------------
-# /file Command (Manual)
-# ------------------------------
-async def send_file(update: Update, context: CallbackContext) -> None:
-    """
-    If a user types /file lover_2024_720p manually, fetch 'telegram_url' from Supabase.
-    """
     if context.args:
         movie_id = context.args[0]
         response = supabase.table(DATABASE_TABLE_NAME) \
@@ -79,7 +51,25 @@ async def send_file(update: Update, context: CallbackContext) -> None:
         else:
             await update.message.reply_text("No file found for this Movie ID.")
     else:
-        await update.message.reply_text("Please provide a Movie ID! Example: /file lover_2024_720p")
+        await update.message.reply_text("Hello! I am your bot. Send /file <movie_id> to get files.")
+
+# ------------------------------
+# /file Command Handler (Manual)
+# ------------------------------
+async def send_file(update: Update, context: CallbackContext) -> None:
+    if context.args:
+        movie_id = context.args[0]
+        response = supabase.table(DATABASE_TABLE_NAME) \
+                           .select("telegram_url") \
+                           .eq("id", movie_id) \
+                           .execute()
+        if response.data:
+            tg_link = response.data[0]["telegram_url"]
+            await update.message.reply_text(f"Here is your file: {tg_link}")
+        else:
+            await update.message.reply_text("No file found for this Movie ID.")
+    else:
+        await update.message.reply_text("Please provide a Movie ID! Example: /file movie123")
 
 # Add command handlers
 telegram_app.add_handler(CommandHandler("start", start))
@@ -99,10 +89,15 @@ app = Flask(__name__)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    update_dict = request.get_json(force=True)
-    update = Update.de_json(update_dict, telegram_app.bot)
-    loop.run_until_complete(telegram_app.process_update(update))
-    return jsonify({"status": "ok"}), 200
+    try:
+        update_dict = request.get_json(force=True)
+        update = Update.de_json(update_dict, telegram_app.bot)
+        loop.run_until_complete(telegram_app.process_update(update))
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        # Print error to logs so you can diagnose the issue
+        print("Webhook processing error:", e)
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route("/")
 def home():
