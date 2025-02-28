@@ -27,8 +27,9 @@ if not DATABASE_TABLE_NAME:
 # Supabase client
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Telegram app
+# Initialize Telegram app
 telegram_app = Application.builder().token(BOT_TOKEN).build()
+telegram_app.initialize()  # <-- Add this line
 
 async def start(update: Update, context: CallbackContext):
     await update.message.reply_text("Hello! I am your bot. Send /file movie123 to get files.")
