@@ -36,11 +36,11 @@ def home():
 
 # Function to run the Telegram bot in a separate thread.
 def run_telegram_bot():
-    # Create and set a new event loop for this thread
+    # Create and set a new event loop for this thread.
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    # Run polling without resetting signals (to avoid errors in non-main threads)
-    tg_app.run_polling(reset_signals=False)
+    # Run polling without the reset_signals argument.
+    tg_app.run_polling()
 
 # Start the Telegram bot in a daemon thread (so it doesn't block the Flask app)
 threading.Thread(target=run_telegram_bot, daemon=True).start()
